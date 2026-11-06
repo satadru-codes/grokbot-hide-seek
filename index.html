@@ -33,11 +33,11 @@ function resize(){DPR=Math.min(2,devicePixelRatio||1);W=innerWidth;H=innerHeight
 // ---------- audio ----------
 let AC=null,master=null,muted=false,voiceOn=true,unlocked=false;
 // --- real WAV clips (HTMLAudioElement plays on iOS even with the silent switch on) ---
-function wavURL(pitch,vol,silent){const SR=22050,n=Math.floor(SR*.34),buf=new ArrayBuffer(44+n*2),v=new DataView(buf);
+function wavURL(pitch,vol,silent){const SR=22050,n=Math.floor(SR*.34/.6),buf=new ArrayBuffer(44+n*2),v=new DataView(buf);
  const w=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));};
  w(0,'RIFF');v.setUint32(4,36+n*2,true);w(8,'WAVE');w(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
  v.setUint32(24,SR,true);v.setUint32(28,SR*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);w(36,'data');v.setUint32(40,n*2,true);
- let ph=0;for(let i=0;i<n;i++){let s=0;if(!silent){const t=i/SR,sec=t>=.17,lt=sec?t-.17:t,base=420*pitch*(sec?1.12:1),f=base*(1.6*Math.exp(-lt*25)+.7);
+ const SLOW=0.6;let ph=0;for(let i=0;i<n;i++){let s=0;if(!silent){const t=i/SR*SLOW,sec=t>=.17,lt=sec?t-.17:t,base=420*pitch*(sec?1.12:1),f=base*(1.6*Math.exp(-lt*25)+.7);
   ph+=2*Math.PI*f/SR;const env=lt<.008?lt/.008:Math.exp(-(lt-.008)*32);s=((Math.sin(ph)>0?1:-1)*.35+Math.sin(ph*2.02)*.65)*env*vol*(sec?.9:1);}
   v.setInt16(44+i*2,Math.max(-1,Math.min(1,s))*32767,true);}
  return URL.createObjectURL(new Blob([buf],{type:'audio/wav'}));}
@@ -50,17 +50,17 @@ function unlock(){ // must run synchronously inside a touch/click handler
   if(AC.state!=='running')AC.resume();const b=AC.createBuffer(1,1,22050),s=AC.createBufferSource();s.buffer=b;s.connect(master);s.start(0);}catch(e){}
  if('speechSynthesis' in window){try{const u=new SpeechSynthesisUtterance(' ');u.volume=0;speechSynthesis.speak(u);}catch(e){}}}
 function pluck(t,f,vol){const o=AC.createOscillator(),o2=AC.createOscillator(),g=AC.createGain(),bp=AC.createBiquadFilter();
- o.type='square';o2.type='triangle';o.frequency.setValueAtTime(f*1.6,t);o.frequency.exponentialRampToValueAtTime(f,t+.05);o.frequency.exponentialRampToValueAtTime(f*.7,t+.12);
- o2.frequency.setValueAtTime(f*2.02,t);o2.frequency.exponentialRampToValueAtTime(f*1.3,t+.1);
+ o.type='square';o2.type='triangle';o.frequency.setValueAtTime(f*1.6,t);o.frequency.exponentialRampToValueAtTime(f,t+.05/.6);o.frequency.exponentialRampToValueAtTime(f*.7,t+.12/.6);
+ o2.frequency.setValueAtTime(f*2.02,t);o2.frequency.exponentialRampToValueAtTime(f*1.3,t+.1/.6);
  bp.type='bandpass';bp.frequency.value=f*3;bp.Q.value=2.5;
- g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(vol,t+.008);g.gain.exponentialRampToValueAtTime(0.0001,t+.13);
- o.connect(bp);o2.connect(bp);bp.connect(g);g.connect(master);o.start(t);o2.start(t);o.stop(t+.15);o2.stop(t+.15);}
-function webBok(pitch,quiet){if(!AC)return;const t=AC.currentTime+.01,f=420*pitch,v=quiet?.06:.35;pluck(t,f,v);pluck(t+.17,f*1.12,v*.9);}
+ g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(vol,t+.008/.6);g.gain.exponentialRampToValueAtTime(0.0001,t+.13/.6);
+ o.connect(bp);o2.connect(bp);bp.connect(g);g.connect(master);o.start(t);o2.start(t);o.stop(t+.15/.6);o2.stop(t+.15/.6);}
+function webBok(pitch,quiet){if(!AC)return;const t=AC.currentTime+.01,f=420*pitch,v=quiet?.06:.35;pluck(t,f,v);pluck(t+.17/.6,f*1.12,v*.9);}
 function playEl(list){for(let k=0;k<list.length;k++){const a=list[(rr_i+k)%list.length];if(a.dataset.u)continue;rr_i++;try{a.currentTime=0;const p=a.play();if(p&&p.catch)p.catch(()=>{});return true;}catch(e){}}return false;}
 function bok(pitch=1,quiet=false,speak=true){if(muted)return;
  let ok;if(quiet)ok=playEl(QUIET);else{let bi=0;PITCHES.forEach((p,i)=>{if(Math.abs(p-pitch)<Math.abs(PITCHES[bi]-pitch))bi=i;});ok=playEl(POOL[bi]);}
  if(!ok)webBok(pitch,quiet);
- if(voiceOn&&!quiet&&speak&&'speechSynthesis' in window){try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance('bok bok!');u.pitch=Math.min(2,.8+pitch*.7);u.rate=1.3;speechSynthesis.speak(u);}catch(e){}}}
+ if(voiceOn&&!quiet&&speak&&'speechSynthesis' in window){try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance('bok bok!');u.pitch=Math.min(2,.8+pitch*.7);u.rate=0.78;speechSynthesis.speak(u);}catch(e){}}}
 function blip(f,d=.08,type='sine',v=.2){if(muted||!AC)return;const t=AC.currentTime,o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.setValueAtTime(f,t);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(g);g.connect(master);o.start(t);o.stop(t+d+.02);}
 // ---------- scene ----------
 const COLORS=['#111111','#ff6a00','#ff9900','#1e88ff','#00bfa5','#ff3399','#8b5cf6','#22c55e','#ef4444','#facc15','#38bdf8','#f2f2f2'];
@@ -126,7 +126,7 @@ function tap(px,py){if(state!=='play')return;let best=null,bd=1e9;
  if(!best){blip(200,.05);return;}
  const left=best.bots.filter(b=>!b.found);
  if(!left.length){best.shake=.4;blip(160,.15,'sawtooth',.08);floaters.push({x:best.x,y:best.y-90*best.s,t:1,txt:'nobody here!'});return;}
- for(const b of left){b.found=true;b.state='found';b.pop=0;b.say=1.4;b.x=best.x+(Math.random()-.5)*60*best.s;b.y=best.y+14*best.s;foundN++;const k=left.indexOf(b);if(k===0)bok(b.pitch);else setTimeout(()=>bok(b.pitch,false,false),k*260);}
+ for(const b of left){b.found=true;b.state='found';b.pop=0;b.say=1.4;b.x=best.x+(Math.random()-.5)*60*best.s;b.y=best.y+14*best.s;foundN++;const k=left.indexOf(b);if(k===0)bok(b.pitch);else setTimeout(()=>bok(b.pitch,false,false),k*433);}
  best.shake=.3;burst(best.x,best.y-40*best.s,18);updHUD();
  if(foundN>=bots.length-1)setTimeout(win,900);}
 let floaters=[];
